@@ -24,6 +24,7 @@
 #define USER_INPUT_LEN 10
 #define STATUSLINE_ARRAY 10
 #define COOKIE_LEN 1024
+#define STRING_LEN 500
 #define CODE_200 0
 #define CODE_303 1
 #define CODE_400 2
@@ -71,6 +72,12 @@ struct extension_list {
     char extension[EXTENSION_LEN];
     char content_type[CONTENTTYPE_LEN];
 	char charaset[CHARASET_LEN];
+};
+struct http_response_head {
+	char [STRING_LEN];
+	char [STRING_LEN];
+	char [STRING_LEN];
+	char [STRING_LEN];
 };
 
 //ステータスラインの情報を格納する構造体
@@ -163,7 +170,7 @@ int main (int argc, char *argv[]) {
 				p_path = strtok(NULL, " ");
 				strcpy(path, p_path);
 				p_version = strtok(NULL, p_path);
-                strcpy(version, p_version);
+				strcpy(version, p_version);
 				if(strstr(path, "?") != NULL){
 					strcpy(buf_path, path);
 					p_path = strtok(buf_path, "?");
@@ -187,10 +194,10 @@ int main (int argc, char *argv[]) {
 	//			printf("user_cookieの値 %s\n", user_cookie);
 			}
 			fputs (buf, fp);
-            if(strcmp(buf, "\r\n") == 0){
+			if(strcmp(buf, "\r\n") == 0){
 				if(strcmp(method, "POST") == 0){
 					fgets(buf, atoi(content_length), sockf);
-                    fputs(buf, fp);
+					fputs(buf, fp);
 					p_username = strtok(buf, "&");
 					p_username = strtok(NULL, "=");
 					p_username = strtok(NULL, "&");
@@ -221,8 +228,8 @@ int main (int argc, char *argv[]) {
 
 		if(strstr(return_path, "../") != NULL){
 			strcpy(return_path, PATH_400);
-            tmp_status_code = CODE_400;
-            error_flag = 1;
+			tmp_status_code = CODE_400;
+			error_flag = 1;
 		}
 		//printf("400処理の直後\n");
 
@@ -235,13 +242,12 @@ int main (int argc, char *argv[]) {
 			error_flag = 1;
 		}
 
-        int file_size = 0;
-        struct stat file;
+		int file_size = 0;
+		struct stat file;
 		//ブラウザに返すファイルを開く
-        //404 該当するページが無かったときの処理
+		 //404 該当するページが無かったときの処理
 
-        if(stat(return_path, &str_file) != 0){
-			//printf("debug code:404の処理を通っていることを確認");
+		if(stat(return_path, &str_file) != 0){
 			strcpy(return_path, PATH_404);
 			tmp_status_code = CODE_404;
 			error_flag = 1;
@@ -261,23 +267,16 @@ int main (int argc, char *argv[]) {
 			text_flag = 1;
 		}
 		//login_check.htmlに来たときの処理
-	//	printf("login_check前");
 		if(strcmp(return_path, LOGIN_CHECK_PATH) == 0){
 			//エラー処理
-			//printf("login_check.htmlの処理%s\n", method);
 			if(strcmp(method, "POST") != 0){
 				strcpy(redirect_location, LOGIN_PAGE_PATH);
-				//printf("postじゃなかった！\n");
 			}
 			//useridもパスワードも正しい場合
 			if(strcmp(username, USERNAME_TEST) == 0 && strcmp(password, PASSWORD_TEST) == 0){
 				strcpy(redirect_location, CONTENT_PAGE_PATH);
-			//	strcpy(return_path, CONTENT_PAGE_PATH);
-				//printf("userid%s,pass %s OK", username,password);
 			} else {
 				strcpy(redirect_location,LOGIN_PAGE_PATH);
-				//printf("userid%s,pass %s", username,password);
-				//printf("どっちか間違えてる\n");
 			}
 			tmp_status_code = CODE_303;
 		}
@@ -295,7 +294,7 @@ int main (int argc, char *argv[]) {
 		//403 閲覧禁止の場合の処理
 
 		if(response == NULL && error_flag == 0){
-          //  printf("debug code:403の処理を通っていることを確認");
+			//  printf("debug code:403の処理を通っていることを確認");
 			tmp_status_code = CODE_403;
 			strcpy(return_path, PATH_403);
 			error_flag = 1;
@@ -317,9 +316,8 @@ int main (int argc, char *argv[]) {
 		}
 
 		fprintf(write_sockf, "%s %d %s\n", str_statusline[tmp_status_code].version, str_statusline[tmp_status_code].status_code, str_statusline[tmp_status_code].explain);
-        fprintf(write_sockf, "Server: Apache\n");
-		fprintf(write_sockf, "Keep-Alive:timeout=2, max=100\n");
-        fprintf(write_sockf, "Accept-Ranges: bytes\n");
+		fprintf(write_sockf, "Server: Apache\n");
+		fprintf(write_sockf, "Accept-Ranges: bytes\n");
 		if(tmp_status_code == CODE_303){
 			fprintf(write_sockf, "Location:%s \n", redirect_location);
 		}
@@ -327,20 +325,20 @@ int main (int argc, char *argv[]) {
 
 		fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; path=/cookie/; expires=%s", COOKIEVALUE1, cookie_expires_string);
 		//Cookieの削除logout.html)
-        int cookie_delete_check;
-        cookie_delete_check = strcmp(return_path, COOKIEDELETE);
-       // printf("cookie_delete_check= %d, return_path=%s, COOKIEDELETE=%s\n", cookie_delete_check, return_path, COOKIEDELETE);
-        if(cookie_delete_check == 0){
-            fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; expires=%s;\n", COOKIEVALUE1, DELETE_COOKIE_DATE);
-        }
+		int cookie_delete_check;
+		cookie_delete_check = strcmp(return_path, COOKIEDELETE);
+		// printf("cookie_delete_check= %d, return_path=%s, COOKIEDELETE=%s\n", cookie_delete_check, return_path, COOKIEDELETE);
+		if(cookie_delete_check == 0){
+			fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; expires=%s;\n", COOKIEVALUE1, DELETE_COOKIE_DATE);
+		}
 		
 		if(binary_flag == 1){
-	        fprintf(write_sockf, "Content-Length: %d\n", file_size);
-    	    fprintf(stdout, "Content-Length: %d\n", file_size);
+			fprintf(write_sockf, "Content-Length: %d\n", file_size);
+   			fprintf(stdout, "Content-Length: %d\n", file_size);
 		}
 		//fprintf(write_sockf, "Content-Lenth: 20\n, fie_sie);
 		fprintf(write_sockf, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
-        fprintf(write_sockf, "\n");
+		fprintf(write_sockf, "\n");
 		//バイナリデータの処理
 		if(binary_flag == 1){
 			write_binary_http_responsebody(response, write_sockf);
@@ -348,7 +346,6 @@ int main (int argc, char *argv[]) {
 		if(text_flag = 1){
 			write_txt_http_responsebody(response, write_sockf);
 		}
-		//close(lissock);
 		//close(accsock);
 		fclose(write_sockf);
 		fclose (sockf);
@@ -357,7 +354,10 @@ int main (int argc, char *argv[]) {
 		printf("close完了\n");
 		sleep(10);
 		exit(0);
-    } else {
+	} else if(pid > 0){
+		printf("親プロセス始まり\n");
+		//close(lissock);
+		close(accsock);
 		waitpid(pid, &status, 0);
 		printf("子プロセス終了%d\n", pid);
 
@@ -365,7 +365,7 @@ int main (int argc, char *argv[]) {
 			printf("exit, status=%d\n", WEXITSTATUS(status));
 		} else {
 		printf("不正終了\n");
-	    }
+		}
 	}
 	}
 }
@@ -387,7 +387,6 @@ int get_extension_list_array_num(char *extension)
 		i++;
 	}
 		return i;
-
 }
 /* ----------------------------------------------------------- *
  *  write_binary_http_responsebody  テキスト形式のhttpレスポンスボディを返却
@@ -428,18 +427,18 @@ void write_txt_http_responsebody(FILE *response, FILE *write_sockf){
  *  ----------------------------------------------------------- */
 char* create_logfilename (char *filename) {
 
-		//logファイルの作成
-		char datetime[TIME];
-		struct tm *str_date;
-		time_t now;
-		now = time(NULL); //時刻の取得
-		str_date = localtime(&now);
-		strftime(datetime,  TIME, "%Y%m%d%H%M%S", str_date);
-    	strcpy(filename,  LOGFILETROOT);
-		strcat(filename, FILE_HEAD);
-		strcat(filename, datetime);
-		strcat(filename, EXTENSION);
-		return filename;
+	//logファイルの作成
+	char datetime[TIME];
+	struct tm *str_date;
+	time_t now;
+	now = time(NULL); //時刻の取得
+	str_date = localtime(&now);
+	strftime(datetime,  TIME, "%Y%m%d%H%M%S", str_date);
+    strcpy(filename,  LOGFILETROOT);
+	strcat(filename, FILE_HEAD);
+	strcat(filename, datetime);
+	strcat(filename, EXTENSION);
+	return filename;
 }
 
 
