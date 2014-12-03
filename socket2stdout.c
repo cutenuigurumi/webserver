@@ -116,7 +116,7 @@ int main (int argc, char *argv[]) {
 			fprintf (stderr, "accept failed\n");
 			continue;
         }
-		int return_kill;
+		//int return_kill;
 		//pidには子プロセスのプロセスidが返ってくる。
 		int pid;
 		pid = fork();
@@ -136,6 +136,9 @@ int main (int argc, char *argv[]) {
 		}
 		if(pid == 0){
 */
+		if(pid  == -1){
+			printf("子プロセスの生成に失敗しました\n");
+		}
 		if(pid == 0){
 		
 		printf("子プロセスが作成されました。%d\n", pid);
@@ -352,6 +355,7 @@ int main (int argc, char *argv[]) {
 		fclose (response);
 		fclose(fp);
 		printf("close完了\n");
+		sleep(10);
 		exit(0);
     } else {
 		waitpid(pid, &status, 0);
@@ -359,10 +363,8 @@ int main (int argc, char *argv[]) {
 
 		if (WIFEXITED(status)){
 			printf("exit, status=%d\n", WEXITSTATUS(status));
-		} else if (WIFSIGNALED(status)){
-			printf("signal, sig=%d\n", WTERMSIG(status));
 		} else {
-		printf("abnormal exit\n");
+		printf("不正終了\n");
 	    }
 	}
 	}
@@ -442,7 +444,7 @@ char* create_logfilename (char *filename) {
 
 
 /* ----------------------------------------------------------- *
- *  create_cookie_limit  cookieの有効期限を作成(GMTに＋１日した)
+ *  create_cookie_expires_string  cookieの有効期限を作成(GMTに＋１日した)
  *  引数：datetime:char型の文字配列
  *  戻り値：datetime:cookieの有効期限(GMT)
  *  ----------------------------------------------------------- */
