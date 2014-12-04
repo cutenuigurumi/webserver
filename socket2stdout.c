@@ -61,6 +61,8 @@ void write_txt_http_responsebody(FILE *, FILE *);
 void write_binary_http_responsebody(FILE *, FILE *);
 //構造体の中の拡張子と同じだったら構造体の何番目の拡張子かを返却する
 int get_extension_list_array_num(char *);
+//ファイルが存在するかを確認
+int is_checked_file_exist(char *);
 
 static int listen_socket (char *port);
 struct statusline {
@@ -72,12 +74,6 @@ struct extension_list {
     char extension[EXTENSION_LEN];
     char content_type[CONTENTTYPE_LEN];
 	char charaset[CHARASET_LEN];
-};
-struct http_response_head {
-	char [STRING_LEN];
-	char [STRING_LEN];
-	char [STRING_LEN];
-	char [STRING_LEN];
 };
 
 //ステータスラインの情報を格納する構造体
@@ -100,18 +96,17 @@ struct extension_list str_extension_list[EXTENSION_ARRAY] = {
 	{".png", "image/png", ""}
 };
 
-
+//使ってない定数は削除する
 int main (int argc, char *argv[]) {
     int lissock;
     char filename[PATH_LEN], return_path[PATH_LEN], parameter_path[PATH_LEN], *p_parameter_path, method[METHOD_LEN], *p_method, path[PATH_LEN], *p_path, version[VERSION_LEN], *p_version, content_length[CONTENT_LENGTH_LEN], *p_content_length, username[USER_INPUT_LEN], password[USER_INPUT_LEN], *p_username, *p_password, user_cookie[COOKIE_LEN], *p_user_cookie;
     FILE *response;
-	struct stat str_file;
 
     lissock = listen_socket (DEFAULT_PORT);
     for (;;) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof addr;
-        int accsock, status_line_flag = 0, tmp_status_code = 0, extension_list_array_num = 0,error_flag = 0, int_content_length = 0, continue_flag = 0, cookie_create_check = 0;
+        int accsock, status_line_flag = 0, tmp_status_code = 0, extension_list_array_num = 0,error_flag = 0, int_content_length = 0, continue_flag = 0, cookie_create_check = 0, file_size = 0;
         char buf_request[BUF_LINE_SIZE],buf[BUF_LINE_SIZE], redirect_location[PATH_LEN], buf_path[PATH_LEN], cookie_expires_string[TIME];
         FILE *fp, *sockf, *write_sockf;
 		char *extension;
@@ -128,7 +123,7 @@ int main (int argc, char *argv[]) {
 		int pid;
 		pid = fork();
 		printf("pid %d", pid);
-/*		if(pid == -1){
+		/*if(pid == -1){
 			fprintf(stderr, "子プロセスの生成に失敗しました。\n");
 		}
 		if(pid > 0){
@@ -142,12 +137,11 @@ int main (int argc, char *argv[]) {
 			}
 		}
 		if(pid == 0){
-*/
+		*/
 		if(pid  == -1){
 			printf("子プロセスの生成に失敗しました\n");
 		}
 		if(pid == 0){
-		
 		printf("子プロセスが作成されました。%d\n", pid);
 
 
@@ -241,13 +235,8 @@ int main (int argc, char *argv[]) {
 		if(extension_list_array_num < EXTENSION_ARRAY){
 			error_flag = 1;
 		}
-
-		int file_size = 0;
-		struct stat file;
-		//ブラウザに返すファイルを開く
-		 //404 該当するページが無かったときの処理
-
-		if(stat(return_path, &str_file) != 0){
+		//404の処理
+		if(is_checked_file_exist(return_path) == -1){
 			strcpy(return_path, PATH_404);
 			tmp_status_code = CODE_404;
 			error_flag = 1;
@@ -346,19 +335,20 @@ int main (int argc, char *argv[]) {
 		if(text_flag = 1){
 			write_txt_http_responsebody(response, write_sockf);
 		}
-		//close(accsock);
 		fclose(write_sockf);
 		fclose (sockf);
 		fclose (response);
 		fclose(fp);
+		close(accsock);
+		close(lissock);
 		printf("close完了\n");
 		sleep(10);
 		exit(0);
-	} else if(pid > 0){
+	} else if(pid != -1){
 		printf("親プロセス始まり\n");
-		//close(lissock);
+		close(lissock);
 		close(accsock);
-		waitpid(pid, &status, 0);
+		wait(&status);
 		printf("子プロセス終了%d\n", pid);
 
 		if (WIFEXITED(status)){
@@ -369,7 +359,24 @@ int main (int argc, char *argv[]) {
 	}
 	}
 }
-
+/* ----------------------------------------------------------- *
+ *  is_checked_file_exist ページが存在するか、しないかを判断。
+ *  引数：return_path: ファイルまでのパスが格納されている文字配列
+ *  戻り値：error_flag : -1ならファイルが存在しない(404)、0なら存在する。
+ *  ----------------------------------------------------------- */
+int is_checked_file_exist(char *return_path)
+{
+	struct stat file;
+	struct stat str_file;
+	int error_flag = 0;
+	printf("is_checked_file_existの中\n");
+	//ブラウザに返すファイルを開く
+	//404 該当するページが無かったときの処理
+	if(stat(return_path, &str_file) != 0){
+		error_flag = -1;
+	}
+	return error_flag;
+}
 /* ----------------------------------------------------------- *
  *  get_extension_list_array_num
  *  構造体の中の拡張子と同じだったら構造体の何番目の拡張子かを返却する
