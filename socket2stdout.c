@@ -346,7 +346,7 @@ int main (int argc, char *argv[]) {
 		exit(0);
 	} else if(pid != -1){
 		printf("親プロセス始まり\n");
-		close(lissock);
+		//close(lissock);
 		close(accsock);
 		wait(&status);
 		printf("子プロセス終了%d\n", pid);
