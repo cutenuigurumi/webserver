@@ -9,9 +9,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #define MAX_BACKLOG 5
-#define DEFAULT_PORT "50000"
 #define BUF_LINE_SIZE 10024
-#define FILENAME 50
 #define TIME 50
 #define METHOD_LEN 5
 #define PAGENAME_LEN 10
@@ -23,30 +21,33 @@
 #define CONTENT_LENGTH_LEN 10
 #define EXTENSION_LEN 10
 #define USER_INPUT_LEN 10
-#define STATUSLINE_ARRAY 10
 #define COOKIE_LEN 1024
-#define STRING_LEN 500
+#define PORT_LEN 100
 #define CODE_200 0
 #define CODE_303 1
 #define CODE_400 2
 #define CODE_403 3
 #define CODE_404 4
 #define EXTENSION_ARRAY 10
+#define STATUSLINE_ARRAY 10
 #define FILE_HEAD "/request_"
 #define EXTENSION ".log"
-#define CONTENT_DIR "/content/"
-#define DOCUMENTROOT "/usr/local/bin/scd_education/www"
-#define LOGFILETROOT "/usr/local/bin/scd_education/log"
+#define SCD_EDUCATION_PATH "/usr/local/bin/scd_education/"
+#define DOCUMENTROOT SCD_EDUCATION_PATH "www"
+#define LOGFILETROOT SCD_EDUCATION_PATH "log"
+#define CONTENT_DIR "content/"
+#define COOKIE_DIR "cookie/"
 #define DELETE_COOKIE_DATE "Fri, 31-Dec-1999 23:59:59 GMT"
 #define COOKIEVALUE1 "cookie_value1"
-#define COOKIEVALUE2 "cookie_value2"
-#define COOKIEDELETE "/usr/local/bin/scd_education/www/cookie/logout.html"
-#define LOGIN_CHECK_PATH "/usr/local/bin/scd_education/www/cookie/login_check.html"
-#define CONTENT_PAGE_PATH "http://54.64.221.93:50000/cookie/content/welcome.html"
-#define LOGIN_PAGE_PATH "http://54.64.221.93:50000/cookie/login.html"
+#define LOGOUT_PATH DOCUMENTROOT COOKIE_DIR "/logout.html"
+#define LOGIN_CHECK_PATH DOCUMENTROOT COOKIE_DIR "login_check.html"
+#define URL "http://54.64.221.93:"
+#define CONTENT_PAGE_PATH COOKIE_DIR  "content/welcome.html"
+#define LOGIN_PAGE_PATH COOKIE_DIR "/login.html"
 #define USERNAME_TEST "admin"
 #define PASSWORD_TEST "nmadmin001"
 
+int is_check_argument_err(int);
 //ステータスエラーページを返す関数
 char* return_status_error_page (int, char*);
 //子プロセスを成仏させる
@@ -101,11 +102,21 @@ struct extension_list str_extension_list[EXTENSION_ARRAY] = {
 
 //使ってない定数は削除する
 int main (int argc, char *argv[]) {
-    int lissock;
-    char filename[PATH_LEN], return_path[PATH_LEN], parameter_path[PATH_LEN], *p_parameter_path, method[METHOD_LEN], *p_method, path[PATH_LEN], *p_path, version[VERSION_LEN], *p_version, content_length[CONTENT_LENGTH_LEN], *p_content_length, username[USER_INPUT_LEN], password[USER_INPUT_LEN], *p_username, *p_password, user_cookie[COOKIE_LEN], *p_user_cookie;
+    int lissock,argument_err_flag;
+    char port_number[PORT_LEN], filename[PATH_LEN], return_path[PATH_LEN], parameter_path[PATH_LEN];
+	/* httpリクエストの解析に使用 */
+	char  *p_parameter_path, method[METHOD_LEN], *p_method, path[PATH_LEN], *p_path, version[VERSION_LEN], *p_version, content_length[CONTENT_LENGTH_LEN], *p_content_length, username[USER_INPUT_LEN], password[USER_INPUT_LEN], *p_username, *p_password, user_cookie[COOKIE_LEN], *p_user_cookie;
     FILE *response;
-
-    lissock = listen_socket (DEFAULT_PORT);
+	
+	printf("%s,%s,%s,%s,%s,%s", DOCUMENTROOT,LOGFILETROOT, LOGOUT_PATH,LOGIN_CHECK_PATH,CONTENT_PAGE_PATH, LOGIN_PAGE_PATH);
+	argument_err_flag = is_check_argument_err(argc);
+	if(argument_err_flag == -1){
+		exit(-1);
+		printf("エラー！終了します\n");
+	}
+	strcpy(port_number, argv[1]);
+    lissock = listen_socket (port_number);
+	printf("listen_socket後%d", lissock);
     for (;;) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof addr;
@@ -114,7 +125,6 @@ int main (int argc, char *argv[]) {
         FILE *fp, *sockf, *write_sockf;
 		char *extension;
 		strcpy(filename, create_logfilename(filename));
-		int status;
 		//ソケットへの接続を待つ動作を用意する
         accsock = accept (lissock, (struct sockaddr*) &addr, &addrlen);
         if (accsock < 0) {
@@ -122,7 +132,7 @@ int main (int argc, char *argv[]) {
 			continue;
         }
 		//pidには子プロセスのプロセスidが返ってくる。
-		int pid;
+		int pid,status;
 		pid = fork();
 		printf("pid %d", pid);
 
@@ -204,12 +214,13 @@ printf("子プロセスが作成されました。%d\n", pid);
 						break;
 					}
 					if(strcmp(method, "GET") == 0){
-						//printf("ループから抜ける直前\n");
+printf("GETでループから抜ける直前\n");
 						break;
 					}
 				}
 			}
 		
+			printf("ループから抜けた\n");
 			//レスポンスを返す
 			if(strcmp(path, "/") == 0){
 				strcpy(path, "/index.html");
@@ -221,6 +232,7 @@ printf("子プロセスが作成されました。%d\n", pid);
 
 			//400 badrequest ディレクトリトラバーサル対策
 			if(strstr(return_path, "../") != NULL){
+				tmp_status_code = CODE_404;
 				strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
 				error_flag = 1;
 			}
@@ -231,7 +243,9 @@ printf("子プロセスが作成されました。%d\n", pid);
 			extension_list_array_num = get_extension_list_array_num(extension);
 //printf("%d", extension_list_array_num);
 
-			if(extension_list_array_num < EXTENSION_ARRAY){
+			if(extension_list_array_num > EXTENSION_ARRAY){
+				tmp_status_code = CODE_404;
+                strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
 				error_flag = 1;
 			}
 			//404の処理
@@ -262,12 +276,25 @@ printf("子プロセスが作成されました。%d\n", pid);
 				}
 				//useridもパスワードも正しい場合
 				if(strcmp(username, USERNAME_TEST) == 0 && strcmp(password, PASSWORD_TEST) == 0){
-					strcpy(redirect_location, CONTENT_PAGE_PATH);
+					strcpy(redirect_location, URL);
+					strcat(redirect_location, port_number);
+					strcat(redirect_location, CONTENT_PAGE_PATH);
+printf("IDパスワード正しい%s\n", redirect_location);
 				} else {
-					strcpy(redirect_location,LOGIN_PAGE_PATH);
+					strcpy(redirect_location, URL);
+					strcat(redirect_location, port_number);
+					strcpy(redirect_location, LOGIN_PAGE_PATH);
 				}
 				tmp_status_code = CODE_303;
 			}
+			//logout.htmlに来た場合の処理（login.htmlに遷移する）
+			if(strcmp(return_path, LOGOUT_PATH) == 0){
+				strcpy(redirect_location, URL);
+				strcat(redirect_location, port_number);
+				strcpy(redirect_location, LOGIN_PAGE_PATH);
+				tmp_status_code = CODE_303;
+			}
+
 			//welcome.htmlに直接来た場合の処理
 //printf("welcome.html前\n%s\n", return_path);
 			if((strstr(return_path, CONTENT_DIR)) != NULL){
@@ -287,7 +314,7 @@ printf("子プロセスが作成されました。%d\n", pid);
 				response = fopen(return_path ,"r");
 			}
 
-			if(error_flag == 0){
+			if(error_flag == 0 && tmp_status_code != CODE_303){
 				tmp_status_code = CODE_200;
 			}
 
@@ -303,7 +330,9 @@ printf("子プロセスが作成されました。%d\n", pid);
 			fprintf(write_sockf, "%s %d %s\n", str_statusline[tmp_status_code].version, str_statusline[tmp_status_code].status_code, str_statusline[tmp_status_code].explain);
 			fprintf(write_sockf, "Server: Apache\n");
 			fprintf(write_sockf, "Accept-Ranges: bytes\n");
+printf("tmp_status_code→%d\n", tmp_status_code);
 			if(tmp_status_code == CODE_303){
+printf("redirect\n");
 				fprintf(write_sockf, "Location:%s \n", redirect_location);
 			}
 //printf("cookieの削除処理の前\n");
@@ -311,7 +340,7 @@ printf("子プロセスが作成されました。%d\n", pid);
 			fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; path=/cookie/; expires=%s", COOKIEVALUE1, cookie_expires_string);
 //Cookieの削除logout.html)
 			int cookie_delete_check;
-			cookie_delete_check = strcmp(return_path, COOKIEDELETE);
+			cookie_delete_check = strcmp(return_path, LOGOUT_PATH);
 // printf("cookie_delete_check= %d, return_path=%s, COOKIEDELETE=%s\n", cookie_delete_check, return_path, COOKIEDELETE);
 			if(cookie_delete_check == 0){
 				fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; expires=%s;\n", COOKIEVALUE1, DELETE_COOKIE_DATE);
@@ -344,12 +373,37 @@ printf("子プロセスが作成されました。%d\n", pid);
 	}
 }
 
+
+
+/* ----------------------------------------------------------- *
+ *  is_check_argument_err コマンドライン引数の数値が正常かを判断する関数
+ *  引数：argc 引数の数
+ *  戻り値 エラーがあれば-1、正常なら0
+ *  ----------------------------------------------------------- */
+int is_check_argument_err(int argc){
+	if(argc > 2){
+		fprintf(stderr, "コマンドライン引数が多すぎます！\n");
+		return -1;
+	}
+	if(argc <= 1){
+		fprintf(stderr, "コマンドライン引数が少なすぎます！\n");
+		return -1;
+	}
+	return 0;
+}
+
+/* ----------------------------------------------------------- *
+ *  return_status_error_page 引数で渡されたステータスコードによって
+ *  ブラウザに返すURLを作成する関数
+ *  引数：count_str_statusline：ステータスコードが黄道帯の何番目に格納されているか
+ *  return_path:ブラウザに返却するパス
+ *  戻り値：return_path
+ *  ----------------------------------------------------------- */
 char* return_status_error_page (int count_str_statusline, char *return_path){
 
 	strcpy(return_path, DOCUMENTROOT);
 	strcat(return_path, str_statusline[count_str_statusline].pagename);
-	printf("return_status_error_pageの中%s\n", return_path);
-
+//printf("return_status_error_pageの中%s\n", return_path);
 	return return_path;
 
 }
@@ -454,7 +508,7 @@ char* create_logfilename (char *filename) {
 
 
 /* ----------------------------------------------------------- *
- *  create_cookie_expires_string  cookieの有効期限を作成(GMTに＋１日した)
+ *  create_cookie_expires_string  cookieの有効期限(GMTに＋１した値)を作成
  *  引数：datetime:char型の文字配列
  *  戻り値：datetime:cookieの有効期限(GMT)
  *  ----------------------------------------------------------- */
@@ -469,7 +523,6 @@ char* create_cookie_limit(char *return_string)
 
 	sprintf(datetime, "%s, %d-%s-%d %d:%d:%d GMT;",  wday[str_gmt->tm_wday], str_gmt->tm_mday+1, wmon[str_gmt->tm_mon], str_gmt->tm_year+1900, str_gmt->tm_hour, str_gmt->tm_min, str_gmt->tm_sec);
 	sprintf(return_string, "Set-Cookie: CUSTOMER=%s; path=/cookie/; expires=%s\n", COOKIEVALUE1, datetime);
-	printf("string %s", return_string);
 	return return_string;
 
 }
@@ -487,7 +540,6 @@ char* strtok_string(char *buffer,char *division_string)
 static int listen_socket (char *port) {
     struct addrinfo hints, *res, *ai;
     int err;
-
 	//アドレス情報を設定する
     memset (&hints, 0, sizeof (struct addrinfo));
 	//ネットワークアドレスの種類(IPv4)を格納
