@@ -75,8 +75,8 @@ struct statusline {
 	char pagename[PAGENAME_LEN];
 };
 struct extension_list {
-    char extension[EXTENSION_LEN];
-    char content_type[CONTENTTYPE_LEN];
+	char extension[EXTENSION_LEN];
+	char content_type[CONTENTTYPE_LEN];
 	char charaset[CHARASET_LEN];
 };
 
@@ -115,7 +115,7 @@ int main (int argc, char *argv[]) {
 	}
 	strcpy(port_number, argv[1]);
 	lissock = listen_socket (port_number);	
-	 for (;;) {
+	for (;;) {
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof addr;
  		int accsock, status_line_flag = 0, tmp_status_code = 0, extension_list_array_num = 0,error_flag = 0, int_content_length = 0, continue_flag = 0, cookie_create_check = 0, file_size = 0;
@@ -146,12 +146,11 @@ printf("親プロセス\n");
 		if (WIFEXITED(status)){
 			printf("exit, status=%d\n", WEXITSTATUS(status));
 		} else {
-		printf("不正終了\n");
+			printf("不正終了\n");
 		}
 
 		if(pid == 0){
 printf("子プロセスが作成されました。%d\n", pid);
-
 
 			//httpリクエストを読み込むファイルディスクリプタ
 			sockf = fdopen (accsock, "r");
@@ -195,7 +194,6 @@ printf("子プロセスが作成されました。%d\n", pid);
 					strcpy(user_cookie, p_user_cookie);
 					//printf("user_cookieの値 %s\n", user_cookie);
 				}
-				fputs (buf, fp);
 				if(strcmp(buf, "\r\n") == 0){
 					if(strcmp(method, "POST") == 0){
 						fgets(buf, atoi(content_length), sockf);
@@ -243,7 +241,7 @@ printf("path %s\n", path);
 
 			if(extension_list_array_num > EXTENSION_ARRAY){
 				tmp_status_code = CODE_404;
-                strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
+				strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
 				error_flag = 1;
 			}
 			//404の処理
@@ -494,7 +492,7 @@ char* create_logfilename (char *filename) {
 	now = time(NULL); //時刻の取得
 	str_date = localtime(&now);
 	strftime(datetime,  TIME, "%Y%m%d%H%M%S", str_date);
-    strcpy(filename,  LOGFILETROOT);
+	strcpy(filename,  LOGFILETROOT);
 	strcat(filename, FILE_HEAD);
 	strcat(filename, datetime);
 	strcat(filename, EXTENSION);
