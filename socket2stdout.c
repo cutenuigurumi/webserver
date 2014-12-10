@@ -11,6 +11,7 @@
 #define MAX_BACKLOG 5
 #define BUF_LINE_SIZE 10024
 #define TIME 50
+#define USER 3
 #define METHOD_LEN 5
 #define PAGENAME_LEN 10
 #define PATH_LEN 10024
@@ -21,13 +22,14 @@
 #define CONTENT_LENGTH_LEN 10
 #define EXTENSION_LEN 10
 #define USER_INPUT_LEN 10
+#define USER_LIST_LEN 10
 #define COOKIE_LEN 1024
 #define PORT_LEN 100
 #define CODE_200 0
 #define CODE_303 1
-#define CODE_400 2
-#define CODE_403 3
-#define CODE_404 4
+#define CODE_400 400
+#define CODE_403 403
+#define CODE_404 404
 #define EXTENSION_ARRAY 10
 #define STATUSLINE_ARRAY 10
 #define FILE_HEAD "/request_"
@@ -47,6 +49,9 @@
 #define USERNAME_TEST "admin"
 #define PASSWORD_TEST "nmadmin001"
 
+//ユーザネームとパスワードが合っているかを確認する関数
+int check_user_login(char *username,char *password);
+//引数のエラーをチェックする関数
 int is_check_argument_err(int);
 //ステータスエラーページを返す関数
 char* return_status_error_page (int, char*);
@@ -79,11 +84,15 @@ struct extension_list {
 	char content_type[CONTENTTYPE_LEN];
 	char charaset[CHARASET_LEN];
 };
+struct user_list{
+	char username[USER_LIST_LEN];
+	char password[USER_LIST_LEN];
+};
 
 //ステータスラインの情報を格納する構造体
 struct statusline str_statusline[STATUSLINE_ARRAY] = {
-	{"HTTP/1.0", 200, "OK"},
-	{"HTTP/1.0", 303, "See Other"},
+	{"HTTP/1.0", 200, "OK", ""},
+	{"HTTP/1.0", 303, "See Other", ""},
 	{"HTTP/1.0", 400, "Bad Request", "/400.html"},
 	{"HTTP/1.0", 403, "Forbidden", "/403.html"},	
 	{"HTTP/1.0", 404, "Not Found", "/404.html"},
@@ -99,8 +108,12 @@ struct extension_list str_extension_list[EXTENSION_ARRAY] = {
 	{".gif", "image/gif", ""},
 	{".png", "image/png", ""}
 };
+struct user_list str_user_list[USER] = {
+	{"test1", "testpass"},
+	{"admin", "nmadmin001"},
+	{"test2", "Testpass"}
+};
 
-//使ってない定数は削除する
 int main (int argc, char *argv[]) {
 	int lissock,argument_err_flag;
 	char port_number[PORT_LEN], filename[PATH_LEN], return_path[PATH_LEN], parameter_path[PATH_LEN];
@@ -111,7 +124,6 @@ int main (int argc, char *argv[]) {
 	argument_err_flag = is_check_argument_err(argc);
 	if(argument_err_flag == -1){
 		exit(-1);
-		printf("エラー！終了します\n");
 	}
 	strcpy(port_number, argv[1]);
 	lissock = listen_socket (port_number);	
@@ -143,11 +155,12 @@ printf("親プロセス\n");
 			close (accsock);
 			continue;
 		}
-		if (WIFEXITED(status)){
-			printf("exit, status=%d\n", WEXITSTATUS(status));
-		} else {
-			printf("不正終了\n");
-		}
+//デバッグコード
+if (WIFEXITED(status)){
+printf("exit, status=%d\n", WEXITSTATUS(status));
+} else {
+printf("不正終了\n");
+}
 
 		if(pid == 0){
 printf("子プロセスが作成されました。%d\n", pid);
@@ -162,6 +175,7 @@ printf("子プロセスが作成されました。%d\n", pid);
 
 			//ここからリクエストを読み込み(while文の中が1リクエスト)
 			while (fgets (buf, BUF_LINE_SIZE, sockf)) {
+printf("%s",buf);
 				if(status_line_flag == 0){
 					//一時変数に格納
 					strcpy(buf_request, buf);
@@ -232,12 +246,12 @@ printf("path %s\n", path);
 				strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
 				error_flag = 1;
 			}
-//printf("400処理の直後\n");
+printf("400処理の直後\n");
 
 			//拡張子を取得
 			extension = strstr(path, ".");
 			extension_list_array_num = get_extension_list_array_num(extension);
-//printf("%d", extension_list_array_num);
+printf("%d", extension_list_array_num);
 
 			if(extension_list_array_num > EXTENSION_ARRAY){
 				tmp_status_code = CODE_404;
@@ -271,7 +285,7 @@ printf("path %s\n", path);
 					strcpy(redirect_location, LOGIN_PAGE_PATH);
 				}
 				//useridもパスワードも正しい場合
-				if(strcmp(username, USERNAME_TEST) == 0 && strcmp(password, PASSWORD_TEST) == 0){
+				if(check_user_login(username,password) == 0){
 					strcpy(redirect_location, URL);
 					strcat(redirect_location, port_number);
 					strcat(redirect_location, CONTENT_PAGE_PATH);
@@ -280,6 +294,7 @@ printf("IDパスワード正しい%s\n", redirect_location);
 					strcpy(redirect_location, URL);
 					strcat(redirect_location, port_number);
 					strcpy(redirect_location, LOGIN_PAGE_PATH);
+printf("間違えてる\n");
 				}
 				tmp_status_code = CODE_303;
 			}
@@ -301,6 +316,7 @@ printf("IDパスワード正しい%s\n", redirect_location);
 					tmp_status_code = CODE_303;
 				}
 			}
+printf("403処理の前\n");
 			//403 閲覧禁止の場合の処理
 			if(response == NULL && error_flag == 0){
 				tmp_status_code = CODE_403;
@@ -316,14 +332,16 @@ printf("IDパスワード正しい%s\n", redirect_location);
 			/* ここから下がcookieの処理	*/
 			cookie_create_check = strcmp(return_path, LOGIN_CHECK_PATH);
 
-
+printf("cookieの処理\n");
 			fprintf(write_sockf, "%s %d %s\n", str_statusline[tmp_status_code].version, str_statusline[tmp_status_code].status_code, str_statusline[tmp_status_code].explain);
 			fprintf(write_sockf, "Server: Apache\n");
+fprintf(stdout, "Server: Apache\n");
 			fprintf(write_sockf, "Accept-Ranges: bytes\n");
+fprintf(stdout, "Accept-Ranges: bytes\n");
 			if(tmp_status_code == CODE_303){
 				fprintf(write_sockf, "Location:%s \n", redirect_location);
 			}
-//printf("cookieの削除処理の前\n");
+printf("cookieの削除処理の前\n");
 	
 //Cookieの削除logout.html)
 			int cookie_delete_check;
@@ -334,7 +352,7 @@ printf("IDパスワード正しい%s\n", redirect_location);
 			}
 
 			//Cookieの作成（login_check.html)
-//printf("cookieの作成\n");
+printf("cookieの作成\n");
 			if(cookie_create_check == 0){
 				strcpy(cookie_expires_string, create_cookie_limit(cookie_expires_string));
 				fprintf(write_sockf, "%s", cookie_expires_string);
@@ -346,6 +364,7 @@ printf("IDパスワード正しい%s\n", redirect_location);
 			}
 			//fprintf(write_sockf, "Content-Lenth: 20\n, fie_sie);
 			fprintf(write_sockf, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
+fprintf(stdout, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
 			fprintf(write_sockf, "\n");
 			//バイナリデータの処理
 			if(binary_flag == 1){
@@ -368,6 +387,26 @@ printf("IDパスワード正しい%s\n", redirect_location);
 }
 
 
+/* ----------------------------------------------------------- *
+ *  check_user_login:usernameとpasswordの組み合わせが正しいかを確認する
+ *  引数：usernamme,password 
+ *  戻り値 エラーがあれば-1、正常なら0
+ *  ----------------------------------------------------------- */
+int check_user_login(char *username,char *password){
+	int i = 0;
+	while(i < USER){
+printf("check_user_loginの中%s, %s\n", username, str_user_list[i].username);
+printf("check_user_loginの中%s, %s\n", password, str_user_list[i].password);
+		if(strcmp(username,str_user_list[i].username) == 0 && strcmp(password, str_user_list[i].password) == 0){
+			printf("一致！\n");
+			return 0;
+		}
+		i++;
+	}
+	return -1;
+	printf("一致しなかった\n");
+
+}
 
 /* ----------------------------------------------------------- *
  *  is_check_argument_err コマンドライン引数の数値が正常かを判断する関数
@@ -393,12 +432,18 @@ int is_check_argument_err(int argc){
  *  return_path:ブラウザに返却するパス
  *  戻り値：return_path
  *  ----------------------------------------------------------- */
-char* return_status_error_page (int count_str_statusline, char *return_path){
+char* return_status_error_page (int count_str_statuscode, char *return_path){
 
-	strcpy(return_path, DOCUMENTROOT);
-	strcat(return_path, str_statusline[count_str_statusline].pagename);
-//printf("return_status_error_pageの中%s\n", return_path);
-	return return_path;
+	int i = 0;
+	while(i < EXTENSION_ARRAY){
+		if(count_str_statuscode == str_statusline[count_str_statuscode].status_code){
+			strcpy(return_path, DOCUMENTROOT);
+			strcat(return_path, str_statusline[count_str_statuscode].pagename);
+			return return_path;
+		}
+		i++;
+	}
+printf("一致してなかった。。。\n");
 
 }
 
