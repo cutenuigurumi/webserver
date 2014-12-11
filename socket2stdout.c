@@ -25,8 +25,8 @@
 #define USER_LIST_LEN 10
 #define COOKIE_LEN 1024
 #define PORT_LEN 100
-#define CODE_200 0
-#define CODE_303 1
+#define CODE_200 200
+#define CODE_303 303
 #define CODE_400 400
 #define CODE_403 403
 #define CODE_404 404
@@ -46,11 +46,11 @@
 #define URL "http://54.64.221.93:"
 #define CONTENT_PAGE_PATH COOKIE_DIR CONTENT_DIR "/welcome.html"
 #define LOGIN_PAGE_PATH COOKIE_DIR "/login.html"
-#define USERNAME_TEST "admin"
-#define PASSWORD_TEST "nmadmin001"
 
+//ステータスコードから、構造体の何番目に格納されているかを返却する関数
+int create_str_statuscode(int);
 //ユーザネームとパスワードが合っているかを確認する関数
-int check_user_login(char *username,char *password);
+int check_user_login(char *,char *);
 //引数のエラーをチェックする関数
 int is_check_argument_err(int);
 //ステータスコードにそってreturn_pathを返す関数
@@ -109,8 +109,8 @@ struct extension_list str_extension_list[EXTENSION_ARRAY] = {
 	{".png", "image/png", ""}
 };
 struct user_list str_user_list[USER] = {
-	{"test1", "testpass"},
-	{"admin", "nmadmin"},
+	{"test1", "test1234"},
+	{"admin", "nmadmin001"},
 	{"user","testpass"},
 };
 
@@ -130,7 +130,7 @@ int main (int argc, char *argv[]) {
 	for (;;) {
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof addr;
- 		int accsock, status_line_flag = 0, tmp_status_code = 0, extension_list_array_num = 0,error_flag = 0, int_content_length = 0, continue_flag = 0, cookie_create_check = 0, file_size = 0;
+ 		int accsock, status_line_flag = 0, tmp_status_code = 0, extension_list_array_num = 0,error_flag = 0, int_content_length = 0, continue_flag = 0, cookie_create_check = 0, file_size = 0, stored_str_statusline = 0;
 		char buf_request[BUF_LINE_SIZE],buf[BUF_LINE_SIZE], redirect_location[PATH_LEN], buf_path[PATH_LEN], cookie_expires_string[TIME];
 		FILE *fp, *sockf, *write_sockf;
 		char *extension;
@@ -228,12 +228,10 @@ printf("子プロセスが作成されました。%d\n", pid);
 				}
 			}
 printf("path %s\n", path);
-			printf("ループから抜けた\n");
 			//レスポンスを返す
 			if(strcmp(path, "/") == 0){
 				strcpy(path, "/index.html");
 			}
-//printf("return_pathを返す直前%s\n", path);
 			strcpy(return_path, DOCUMENTROOT);
 			strcat(return_path, path);
 			printf("フルパス %s\n", return_path);
@@ -241,7 +239,8 @@ printf("path %s\n", path);
 			//400 badrequest ディレクトリトラバーサル対策
 			if(strstr(return_path, "../") != NULL){
 				tmp_status_code = CODE_404;
-				strcpy(return_path,create_return_path(tmp_status_code, return_path));
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
+				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
 				error_flag = 1;
 			}
 printf("400処理の直後\n");
@@ -249,17 +248,22 @@ printf("400処理の直後\n");
 			//拡張子を取得
 			extension = strstr(path, ".");
 			extension_list_array_num = get_extension_list_array_num(extension);
-printf("%d", extension_list_array_num);
-
 			if(extension_list_array_num > EXTENSION_ARRAY){
 				tmp_status_code = CODE_404;
-				strcpy(return_path,create_return_path(tmp_status_code, return_path));
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
+				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+printf("tmp_status_code=%d, return_path=%s 404の処理\n", tmp_status_code,return_path);
 				error_flag = 1;
 			}
+printf("404の直前\n");
 			//404の処理
 			if(is_checked_file_exist(return_path) == -1){
 				tmp_status_code = CODE_404;
-				strcpy(return_path, create_return_path(tmp_status_code, return_path));
+printf("tmp_status_code%d\n",tmp_status_code);
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
+printf("stored_str_statusline%d\n", stored_str_statusline);
+				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+printf("tmp_status_code=%d, return_path=%s 404の処理\n", tmp_status_code,return_path);
 				error_flag = 1;
 			}
 			int binary_flag = 0, text_flag = 0;
@@ -295,6 +299,7 @@ printf("IDパスワード正しい%s\n", redirect_location);
 printf("間違えてる\n");
 				}
 				tmp_status_code = CODE_303;
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
 			}
 			//logout.htmlに来た場合の処理（login.htmlに遷移する）
 			if(strcmp(return_path, LOGOUT_PATH) == 0){
@@ -302,6 +307,7 @@ printf("間違えてる\n");
 				strcat(redirect_location, port_number);
 				strcat(redirect_location, LOGIN_PAGE_PATH);
 				tmp_status_code = CODE_303;
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
 			}
 
 			//welcome.htmlに直接来た場合の処理
@@ -312,28 +318,29 @@ printf("間違えてる\n");
 //printf("user_cookie value=%s, COOKIEVALUE1=%s\n", user_cookie, COOKIEVALUE1);
 					strcpy(redirect_location, LOGIN_PAGE_PATH);
 					tmp_status_code = CODE_303;
+					stored_str_statusline = create_str_statuscode(tmp_status_code);
 				}
 			}
 printf("403処理の前\n");
 			//403 閲覧禁止の場合の処理
 			if(response == NULL && error_flag == 0){
 				tmp_status_code = CODE_403;
-				strcpy(return_path, create_return_path(tmp_status_code, return_path));
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
+				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
 				error_flag = 1;
 				//上でパスを変更しているので開き直す
 				response = fopen(return_path ,"r");
 			}
 			if(error_flag == 0 && tmp_status_code != CODE_303){
 				tmp_status_code = CODE_200;
-				create_return_path(tmp_status_code,return_path);
-printf("200のなか%s", return_path);
+				stored_str_statusline = create_str_statuscode(tmp_status_code);
 			}
 
 			/* ここから下がcookieの処理	*/
 			cookie_create_check = strcmp(return_path, LOGIN_CHECK_PATH);
 
 printf("cookieの処理\n");
-			fprintf(write_sockf, "%s %d %s\n", str_statusline[tmp_status_code].version, str_statusline[tmp_status_code].status_code, str_statusline[tmp_status_code].explain);
+			fprintf(write_sockf, "%s %d %s\n", str_statusline[stored_str_statusline].version, str_statusline[stored_str_statusline].status_code, str_statusline[stored_str_statusline].explain);
 			fprintf(write_sockf, "Server: Apache\n");
 fprintf(stdout, "Server: Apache\n");
 			fprintf(write_sockf, "Accept-Ranges: bytes\n");
@@ -360,11 +367,9 @@ printf("cookieの作成\n");
 		
 			if(binary_flag == 1){
 				fprintf(write_sockf, "Content-Length: %d\n", file_size);
-   				fprintf(stdout, "Content-Length: %d\n", file_size);
 			}
 			//fprintf(write_sockf, "Content-Lenth: 20\n, fie_sie);
 			fprintf(write_sockf, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
-fprintf(stdout, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
 			fprintf(write_sockf, "\n");
 			//バイナリデータの処理
 			if(binary_flag == 1){
@@ -424,29 +429,35 @@ int is_check_argument_err(int argc){
 	}
 	return 0;
 }
+/* ----------------------------------------------------------- *
+ *  create_str_statuscode ステータスコードから構造体の何番目に格納されているか
+ *  を返却する関数
+ *  引数：statuscode ステータスコード
+ *  戻り値 構造体の何番目に格納されているか
+ *  ----------------------------------------------------------- */
+int create_str_statuscode(int stored_number)
+{
+	int i, statusline_array;
+	statusline_array = STATUSLINE_ARRAY;
+	for(i = 0;i < statusline_array; i++){
+		if(stored_number == str_statusline[i].status_code){
+			return i;
+		}
+	}
+}
 
 /* ----------------------------------------------------------- *
- *  create_return_path 引数で渡されたステータスコードによって
+ *   引数で渡されたステータスコードによって
  *  ブラウザに返すURLを作成する関数
  *  引数：count_str_statusline：ステータスコードが黄道帯の何番目に格納されているか
  *  return_path:ブラウザに返却するパス
- *  戻り値：return_path
+ *  戻り値：i 構造体の何番目に格納されているか return_pathブラウザに返却するパス
  *  ----------------------------------------------------------- */
-char* create_return_path (int count_str_statuscode, char *return_path){
+char* create_return_path (int statuscode, char *return_path){
 
-	int i = 0;
-	while(i < EXTENSION_ARRAY){
-		if(count_str_statuscode == CODE_200){
-			return return_path;		
-		}
-		if(count_str_statuscode == str_statusline[count_str_statuscode].status_code){
-			strcpy(return_path, DOCUMENTROOT);
-			strcat(return_path, str_statusline[count_str_statuscode].pagename);
-			return return_path;
-		}
-		i++;
-	}
-printf("一致してなかった。。。\n");
+printf("create_return_pathの中%d\n", statuscode);
+	strcpy(return_path, DOCUMENTROOT);
+	strcat(return_path, str_statusline[statuscode].pagename);
 
 }
 
