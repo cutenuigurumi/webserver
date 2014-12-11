@@ -53,8 +53,8 @@
 int check_user_login(char *username,char *password);
 //引数のエラーをチェックする関数
 int is_check_argument_err(int);
-//ステータスエラーページを返す関数
-char* return_status_error_page (int, char*);
+//ステータスコードにそってreturn_pathを返す関数
+char* create_return_path(int, char*);
 //子プロセスを成仏させる
 void kill_child_process ();
 //logfileの名前を作成する関数
@@ -110,8 +110,8 @@ struct extension_list str_extension_list[EXTENSION_ARRAY] = {
 };
 struct user_list str_user_list[USER] = {
 	{"test1", "testpass"},
-	{"admin", "nmadmin001"},
-	{"test2", "Testpass"}
+	{"admin", "nmadmin"},
+	{"user","testpass"},
 };
 
 int main (int argc, char *argv[]) {
@@ -175,7 +175,6 @@ printf("子プロセスが作成されました。%d\n", pid);
 
 			//ここからリクエストを読み込み(while文の中が1リクエスト)
 			while (fgets (buf, BUF_LINE_SIZE, sockf)) {
-printf("%s",buf);
 				if(status_line_flag == 0){
 					//一時変数に格納
 					strcpy(buf_request, buf);
@@ -224,7 +223,6 @@ printf("%s",buf);
 						break;
 					}
 					if(strcmp(method, "GET") == 0){
-printf("GETでループから抜ける直前\n");
 						break;
 					}
 				}
@@ -243,7 +241,7 @@ printf("path %s\n", path);
 			//400 badrequest ディレクトリトラバーサル対策
 			if(strstr(return_path, "../") != NULL){
 				tmp_status_code = CODE_404;
-				strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
+				strcpy(return_path,create_return_path(tmp_status_code, return_path));
 				error_flag = 1;
 			}
 printf("400処理の直後\n");
@@ -255,13 +253,13 @@ printf("%d", extension_list_array_num);
 
 			if(extension_list_array_num > EXTENSION_ARRAY){
 				tmp_status_code = CODE_404;
-				strcpy(return_path,return_status_error_page(tmp_status_code, return_path));
+				strcpy(return_path,create_return_path(tmp_status_code, return_path));
 				error_flag = 1;
 			}
 			//404の処理
 			if(is_checked_file_exist(return_path) == -1){
 				tmp_status_code = CODE_404;
-				strcpy(return_path, return_status_error_page(tmp_status_code, return_path));
+				strcpy(return_path, create_return_path(tmp_status_code, return_path));
 				error_flag = 1;
 			}
 			int binary_flag = 0, text_flag = 0;
@@ -320,13 +318,15 @@ printf("403処理の前\n");
 			//403 閲覧禁止の場合の処理
 			if(response == NULL && error_flag == 0){
 				tmp_status_code = CODE_403;
-				strcpy(return_path, return_status_error_page(tmp_status_code, return_path));
+				strcpy(return_path, create_return_path(tmp_status_code, return_path));
 				error_flag = 1;
 				//上でパスを変更しているので開き直す
 				response = fopen(return_path ,"r");
 			}
 			if(error_flag == 0 && tmp_status_code != CODE_303){
 				tmp_status_code = CODE_200;
+				create_return_path(tmp_status_code,return_path);
+printf("200のなか%s", return_path);
 			}
 
 			/* ここから下がcookieの処理	*/
@@ -426,16 +426,19 @@ int is_check_argument_err(int argc){
 }
 
 /* ----------------------------------------------------------- *
- *  return_status_error_page 引数で渡されたステータスコードによって
+ *  create_return_path 引数で渡されたステータスコードによって
  *  ブラウザに返すURLを作成する関数
  *  引数：count_str_statusline：ステータスコードが黄道帯の何番目に格納されているか
  *  return_path:ブラウザに返却するパス
  *  戻り値：return_path
  *  ----------------------------------------------------------- */
-char* return_status_error_page (int count_str_statuscode, char *return_path){
+char* create_return_path (int count_str_statuscode, char *return_path){
 
 	int i = 0;
 	while(i < EXTENSION_ARRAY){
+		if(count_str_statuscode == CODE_200){
+			return return_path;		
+		}
 		if(count_str_statuscode == str_statusline[count_str_statuscode].status_code){
 			strcpy(return_path, DOCUMENTROOT);
 			strcat(return_path, str_statusline[count_str_statuscode].pagename);
