@@ -62,6 +62,12 @@ int main()
 		exit(0);
 }
 
+/* ----------------------------------------------------------- *
+ *  func_which_win:関数を呼び出した方が勝ったか、引き分けかを判定する関数
+ *  引数： take_both_finger:実際に出した値
+ *  call_sum_finger：ターン主が宣言した値
+ *  戻り値　result 勝てば-1を返却。負ければ0を返却
+ * ----------------------------------------------------------- */
 int func_which_win(int take_both_finger, int call_sum_finger)
 {
 	int result = 0;
