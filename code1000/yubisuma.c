@@ -21,17 +21,15 @@ int func_which_win(int,int);
 
 int main()
 {
-
 	/*変数解説
 	 * my_finger_restとenemy_finger_rest 自分の指の残りの本数
 	 * sum_finger_rest 上二つを合わせた変数
 	*/
-	int is_start_flag = 0,play_flag = 0,turn = 0,my_finger_rest = REST_FINGER,sum_finger_rest = 0, enemy_finger_rest = REST_FINGER, error_flag = 0; 
+	int is_start_flag = 0,play_flag = 0,turn = 0,my_finger_rest = REST_FINGER,sum_finger_rest = 0, enemy_finger_rest = REST_FINGER,end_flag = 0, error_flag = 0; 
 
-	printf("使い方をみますか？Yes:0 No:1\n");
+	printf("使い方をみますか？Yes:1 No:0\n");
 	play_flag = scanf_int();
-	printf("play_flag = %d\n", play_flag);
-	if(play_flag == 0){
+	if(play_flag != 0){
 		display_how_to_play();
 		printf("0 ゲームに移動 1 やめる\n");
 		is_start_flag =  scanf_int();
@@ -40,25 +38,31 @@ int main()
 		printf("終了します\n");
 		exit(-1);
 	}
-
-	sum_finger_rest = my_finger_rest + enemy_finger_rest;
-		do{
-		//偶数は自分のターン、奇数は相手のターン
-		printf("いっせーの…\n");
-		if(turn % 2 == 0){
-			printf("あなたのターン\n");
-			func_my_turn(&my_finger_rest,&enemy_finger_rest, &turn);
-
-		}else{
-			printf("敵のターン\n");
-			do{
-				func_enemy_turn(&my_finger_rest,&enemy_finger_rest, &turn);
-			}while(error_flag == 1);
-		}
+	do{
 		sum_finger_rest = my_finger_rest + enemy_finger_rest;
-		printf("残りの指の本数：%d　あなた：%d　あいて：%d\n", sum_finger_rest, my_finger_rest,enemy_finger_rest);
-		turn++;
+		do{
+			//偶数は自分のターン、奇数は相手のターン
+			printf("いっせーの…\n");
+			if(turn % 2 == 0){
+				printf("あなたのターン\n");
+				func_my_turn(&my_finger_rest,&enemy_finger_rest, &turn);
+			}else{
+				printf("敵のターン\n");
+				do{
+					func_enemy_turn(&my_finger_rest,&enemy_finger_rest, &turn);
+				}while(error_flag == 1);
+			}
+			sum_finger_rest = my_finger_rest + enemy_finger_rest;
+			printf("残りの指の本数：%d　あなた：%d　あいて：%d\n", sum_finger_rest, my_finger_rest,enemy_finger_rest);
+			turn++;
 		}while(my_finger_rest > 0 && enemy_finger_rest > 0);
+		printf("もう一回遊ぶ？\n Yes 1:No:0");
+		end_flag = scanf_int();
+		if(end_flag == 1){
+			//初期化する。これをやらないと結果が引き継がれてしまって2回戦目の手が0から始まる。
+			turn = 0,my_finger_rest = REST_FINGER,sum_finger_rest = 0, enemy_finger_rest = REST_FINGER;
+		}
+	}while(end_flag == 1);
 		exit(0);
 }
 
@@ -107,7 +111,7 @@ int func_enemy_turn(int *my_finger_rest,int *enemy_finger_rest,int *turn)
 	call_sum_finger = create_enemy_call_sum_of_fingers(sum_finger_rest);
 	printf("せっ%d！！！", call_sum_finger);
 	/*強くする処理
-	 *e.g. いっせーのせ！で0と宣言しているのに、2を出したりしないように */
+	 *e.g. いっせーのせ！で0と宣言しているのに、2を出したりしないようにする処理 */
 	do{
 		take_enemy_finger = create_enemy_number_of_fingers(&enemy_finger_rest);
 	}while(take_enemy_finger > call_sum_finger);
