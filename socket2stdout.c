@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <unistd.h>
 #define MAX_BACKLOG 5
 #define BUF_LINE_SIZE 10024
 #define TIME 50
@@ -115,7 +117,7 @@ struct user_list str_user_list[USER] = {
 };
 
 int main (int argc, char *argv[]) {
-	int lissock,argument_err_flag;
+	int lissock,argument_err_flag, fd;
 	char port_number[PORT_LEN], filename[PATH_LEN], return_path[PATH_LEN], parameter_path[PATH_LEN];
 	/* httpリクエストの解析に使用 */
 	char  *p_parameter_path, method[METHOD_LEN], *p_method, path[PATH_LEN], *p_path, version[VERSION_LEN], *p_version, content_length[CONTENT_LENGTH_LEN], *p_content_length, username[USER_INPUT_LEN], password[USER_INPUT_LEN], *p_username, *p_password, user_cookie[COOKIE_LEN], *p_user_cookie;
@@ -151,27 +153,38 @@ int main (int argc, char *argv[]) {
 		} else if(pid > 0){
 printf("親プロセス\n");
 			//子プロセスがexitしていたらkill_child_processを実行
-			signal (SIGCHLD, kill_child_process);
-			close (accsock);
+//			signal (SIGCHLD, kill_child_process);
+//			close (accsock);
+			exit(EXIT_SUCCESS);
 			continue;
 		}
-//デバッグコード
-if (WIFEXITED(status)){
-printf("exit, status=%d\n", WEXITSTATUS(status));
-} else {
-printf("不正終了\n");
-}
 
 		if(pid == 0){
 printf("子プロセスが作成されました。%d\n", pid);
+		if(setsid() == -1){
+			return (-1);
+		}
+		//孫プロセスの作成
+		if(fork() != 0){
+			exit(0);
+		}
+		if(nochdir == 0){
+			chdir("/");
+		}
 
+		if (noclose == 0 && (fd = open("/dev/null", O_RDWR, 0)) != -1) {      
+			dup2(fd, STDIN_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			dup2(fd, STDERR_FILENO);
+ 		if (fd > STDERR_FILENO)
+			close(fd)
+		}
 			//httpリクエストを読み込むファイルディスクリプタ
 			sockf = fdopen (accsock, "r");
 			//httpレスポンスを返すファイルディスプリプタ
 			write_sockf = fdopen(accsock, "w");
 			//logを書き込むファイルディスクリプタ
 			fp = fopen(filename, "w");
-
 
 			//ここからリクエストを読み込み(while文の中が1リクエスト)
 			while (fgets (buf, BUF_LINE_SIZE, sockf)) {
