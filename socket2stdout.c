@@ -50,7 +50,7 @@
 #define LOGIN_PAGE_PATH COOKIE_DIR "/login.html"
 
 //ステータスコードから、構造体の何番目に格納されているかを返却する関数
-int create_str_statuscode(int);
+int get_str_statuscode(int);
 //ユーザネームとパスワードが合っているかを確認する関数
 int check_user_login(char *,char *);
 //引数のエラーをチェックする関数
@@ -149,257 +149,268 @@ int main (int argc, char *argv[]) {
 		printf("pid %d", pid);
 
 		if(pid  == -1){
-			printf("子プロセスの生成に失敗しました\n");
+printf("子プロセスの生成に失敗しました\n");
 		} else if(pid > 0){
 printf("親プロセス\n");
 			//子プロセスがexitしていたらkill_child_processを実行
 //			signal (SIGCHLD, kill_child_process);
 //			close (accsock);
-			exit(EXIT_SUCCESS);
+			exit(0);
 			continue;
 		}
 
 		if(pid == 0){
 printf("子プロセスが作成されました。%d\n", pid);
-		if(setsid() == -1){
-			return (-1);
-		}
-		//孫プロセスの作成
-		if(fork() != 0){
-			exit(0);
-		}
-		if(nochdir == 0){
-			chdir("/");
-		}
+			int mago_pid;
+				if(setsid() == -1){
+					return (-1);
+				}
+				//孫プロセスの作成
+				mago_pid = fork();
+				if(mago_pid == -1){
+printf("孫プロセスの生成に失敗しました\n");
+					continue;
+				} else if (mago_pid > 0){
+printf("子プロセス\n");			
+					signal (SIGCHLD, kill_child_process);
+					close (accsock);
+					continue;
+				}
+				if(mago_pid == 0){
+printf("孫プロセス\n");
 
-		if (noclose == 0 && (fd = open("/dev/null", O_RDWR, 0)) != -1) {      
-			dup2(fd, STDIN_FILENO);
-			dup2(fd, STDOUT_FILENO);
-			dup2(fd, STDERR_FILENO);
- 		if (fd > STDERR_FILENO)
-			close(fd)
-		}
-			//httpリクエストを読み込むファイルディスクリプタ
-			sockf = fdopen (accsock, "r");
-			//httpレスポンスを返すファイルディスプリプタ
-			write_sockf = fdopen(accsock, "w");
-			//logを書き込むファイルディスクリプタ
-			fp = fopen(filename, "w");
+				chdir("/");
 
-			//ここからリクエストを読み込み(while文の中が1リクエスト)
-			while (fgets (buf, BUF_LINE_SIZE, sockf)) {
-				if(status_line_flag == 0){
-					//一時変数に格納
-					strcpy(buf_request, buf);
-					//リクエストラインの解析
-					p_method = strtok(buf_request, " ");
-					strcpy(method, p_method);
-					p_path = strtok(NULL, " ");
-					strcpy(path, p_path);
-					p_version = strtok(NULL, p_path);
-					strcpy(version, p_version);
-					if(strstr(path, "?") != NULL){
-						strcpy(buf_path, path);
-						p_path = strtok(buf_path, "?");
+				if (fd = open("/dev/null", O_RDWR, 0) != -1) {      
+					dup2(fd, STDIN_FILENO);
+					dup2(fd, STDOUT_FILENO);
+					dup2(fd, STDERR_FILENO);
+		 			if (fd > STDERR_FILENO){
+						close(fd);
+					}
+				}
+				//httpリクエストを読み込むファイルディスクリプタ
+				sockf = fdopen (accsock, "r");
+				//httpレスポンスを返すファイルディスプリプタ
+				write_sockf = fdopen(accsock, "w");
+				//logを書き込むファイルディスクリプタ
+				fp = fopen(filename, "w");
+
+				//ここからリクエストを読み込み(while文の中が1リクエスト)
+				while (fgets (buf, BUF_LINE_SIZE, sockf)) {
+					if(status_line_flag == 0){
+						//一時変数に格納
+						strcpy(buf_request, buf);
+						//リクエストラインの解析
+						p_method = strtok(buf_request, " ");
+						strcpy(method, p_method);
+						p_path = strtok(NULL, " ");
 						strcpy(path, p_path);
-						p_parameter_path = strtok(NULL, " ");
-						strcpy(parameter_path, p_parameter_path);
+						p_version = strtok(NULL, p_path);
+						strcpy(version, p_version);
+						if(strstr(path, "?") != NULL){
+							strcpy(buf_path, path);
+							p_path = strtok(buf_path, "?");
+							strcpy(path, p_path);
+							p_parameter_path = strtok(NULL, " ");
+							strcpy(parameter_path, p_parameter_path);
+						}
+						status_line_flag = 1;
 					}
-					status_line_flag = 1;
-				}
-				if(strstr(buf, "Content-Length:") != NULL){
-					p_content_length = strtok(buf, ":");
-					p_content_length = strtok(NULL, ":");
-					strcpy(content_length, p_content_length);
-				}
+					if(strstr(buf, "Content-Length:") != NULL){
+						p_content_length = strtok(buf, ":");
+						p_content_length = strtok(NULL, ":");
+						strcpy(content_length, p_content_length);
+					}
 
-				if(strstr(buf, "Cookie:") != NULL){
-					p_user_cookie = strtok(buf, ":");
-					p_user_cookie = strtok(NULL, "=");
-					p_user_cookie = strtok(NULL, "\r\n");
-					strcpy(user_cookie, p_user_cookie);
-					//printf("user_cookieの値 %s\n", user_cookie);
-				}
-				if(strcmp(buf, "\r\n") == 0){
-					if(strcmp(method, "POST") == 0){
-						fgets(buf, atoi(content_length), sockf);
-						fputs(buf, fp);
-						p_username = strtok(buf, "&");
-						p_username = strtok(NULL, "=");
-						p_username = strtok(NULL, "&");
-						strcpy(username, p_username);
-						p_password = strtok(NULL, "&");
-						p_password = strtok(NULL, "=");
-						p_password = strtok(NULL, "&");
-						strcpy(password, p_password);
-						//	printf("username = \"%s\", password = \"%s\"", username, password);
-						break;
+					if(strstr(buf, "Cookie:") != NULL){
+						p_user_cookie = strtok(buf, ":");
+						p_user_cookie = strtok(NULL, "=");
+						p_user_cookie = strtok(NULL, "\r\n");
+						strcpy(user_cookie, p_user_cookie);
+						//printf("user_cookieの値 %s\n", user_cookie);
 					}
-					if(strcmp(method, "GET") == 0){
-						break;
+					if(strcmp(buf, "\r\n") == 0){
+						if(strcmp(method, "POST") == 0){
+							fgets(buf, atoi(content_length), sockf);
+							fputs(buf, fp);
+							p_username = strtok(buf, "&");
+							p_username = strtok(NULL, "=");
+							p_username = strtok(NULL, "&");
+							strcpy(username, p_username);
+							p_password = strtok(NULL, "&");
+							p_password = strtok(NULL, "=");
+							p_password = strtok(NULL, "&");
+							strcpy(password, p_password);
+							//	printf("username = \"%s\", password = \"%s\"", username, password);
+							break;
+						}
+						if(strcmp(method, "GET") == 0){
+							break;
+						}
 					}
 				}
-			}
 printf("path %s\n", path);
-			//レスポンスを返す
-			if(strcmp(path, "/") == 0){
-				strcpy(path, "/index.html");
-			}
-			strcpy(return_path, DOCUMENTROOT);
-			strcat(return_path, path);
-			printf("フルパス %s\n", return_path);
-
-			//400 badrequest ディレクトリトラバーサル対策
-			if(strstr(return_path, "../") != NULL){
-				tmp_status_code = CODE_404;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
-				error_flag = 1;
-			}
+				//レスポンスを返す
+				if(strcmp(path, "/") == 0){
+					strcpy(path, "/index.html");
+				}
+				strcpy(return_path, DOCUMENTROOT);
+				strcat(return_path, path);
+				printf("フルパス %s\n", return_path);
+	
+				//400 badrequest ディレクトリトラバーサル対策
+				if(strstr(return_path, "../") != NULL){
+					tmp_status_code = CODE_404;
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
+					strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+					error_flag = 1;
+				}
 printf("400処理の直後\n");
 
-			//拡張子を取得
-			extension = strstr(path, ".");
-			extension_list_array_num = get_extension_list_array_num(extension);
-			if(extension_list_array_num > EXTENSION_ARRAY){
-				tmp_status_code = CODE_404;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+				//拡張子を取得
+				extension = strstr(path, ".");
+				extension_list_array_num = get_extension_list_array_num(extension);
+				if(extension_list_array_num > EXTENSION_ARRAY){
+					tmp_status_code = CODE_404;
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
+					strcpy(return_path,create_return_path(stored_str_statusline, return_path));
 printf("tmp_status_code=%d, return_path=%s 404の処理\n", tmp_status_code,return_path);
-				error_flag = 1;
-			}
+					error_flag = 1;
+				}
 printf("404の直前\n");
-			//404の処理
-			if(is_checked_file_exist(return_path) == -1){
-				tmp_status_code = CODE_404;
+				//404の処理
+				if(is_checked_file_exist(return_path) == -1){
+					tmp_status_code = CODE_404;
 printf("tmp_status_code%d\n",tmp_status_code);
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
 printf("stored_str_statusline%d\n", stored_str_statusline);
-				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+					strcpy(return_path,create_return_path(stored_str_statusline, return_path));
 printf("tmp_status_code=%d, return_path=%s 404の処理\n", tmp_status_code,return_path);
-				error_flag = 1;
-			}
-			int binary_flag = 0, text_flag = 0;
-			if((strstr(str_extension_list[extension_list_array_num].content_type, "image")) != NULL){
-				response = fopen(return_path, "rb");
-				if(response != NULL){
-					binary_flag = 1;
-					//Content-Lengthで使用する文字数カウントの処理
-					fseek(response, 0L, SEEK_END);
-					file_size = ftell(response);
-					fseek(response, 0L, SEEK_SET);
+					error_flag = 1;
 				}
-			} else {
-				response = fopen(return_path, "r");
-				text_flag = 1;
-			}
-			//login_check.htmlに来たときの処理
-			if(strcmp(return_path, LOGIN_CHECK_PATH) == 0){
-				//エラー処理
-				if(strcmp(method, "POST") != 0){
-					strcpy(redirect_location, LOGIN_PAGE_PATH);
-				}
-				//useridもパスワードも正しい場合
-				if(check_user_login(username,password) == 0){
-					strcpy(redirect_location, URL);
-					strcat(redirect_location, port_number);
-					strcat(redirect_location, CONTENT_PAGE_PATH);
-printf("IDパスワード正しい%s\n", redirect_location);
+				int binary_flag = 0, text_flag = 0;
+				if((strstr(str_extension_list[extension_list_array_num].content_type, "image")) != NULL){
+					response = fopen(return_path, "rb");
+					if(response != NULL){
+						binary_flag = 1;
+						//Content-Lengthで使用する文字数カウントの処理
+						fseek(response, 0L, SEEK_END);
+						file_size = ftell(response);
+						fseek(response, 0L, SEEK_SET);
+					}
 				} else {
+					response = fopen(return_path, "r");
+					text_flag = 1;
+				}
+				//login_check.htmlに来たときの処理
+				if(strcmp(return_path, LOGIN_CHECK_PATH) == 0){
+					//エラー処理
+					if(strcmp(method, "POST") != 0){
+						strcpy(redirect_location, LOGIN_PAGE_PATH);
+					}
+					//useridもパスワードも正しい場合
+					if(check_user_login(username,password) == 0){
+						strcpy(redirect_location, URL);
+						strcat(redirect_location, port_number);
+						strcat(redirect_location, CONTENT_PAGE_PATH);
+printf("IDパスワード正しい%s\n", redirect_location);
+					} else {
+						strcpy(redirect_location, URL);
+						strcat(redirect_location, port_number);
+						strcpy(redirect_location, LOGIN_PAGE_PATH);
+printf("間違えてる\n");
+					}
+					tmp_status_code = CODE_303;
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
+				}
+				//logout.htmlに来た場合の処理（login.htmlに遷移する）
+				if(strcmp(return_path, LOGOUT_PATH) == 0){
 					strcpy(redirect_location, URL);
 					strcat(redirect_location, port_number);
-					strcpy(redirect_location, LOGIN_PAGE_PATH);
-printf("間違えてる\n");
-				}
-				tmp_status_code = CODE_303;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-			}
-			//logout.htmlに来た場合の処理（login.htmlに遷移する）
-			if(strcmp(return_path, LOGOUT_PATH) == 0){
-				strcpy(redirect_location, URL);
-				strcat(redirect_location, port_number);
-				strcat(redirect_location, LOGIN_PAGE_PATH);
-				tmp_status_code = CODE_303;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-			}
-
-			//welcome.htmlに直接来た場合の処理
-//printf("welcome.html前\n%s\n", return_path);
-			if((strstr(return_path, CONTENT_DIR)) != NULL){
-				//cookieを持っていなかったらlogin.htmlにリダイレクト
-				if(strcmp(user_cookie, COOKIEVALUE1) != 0){
-//printf("user_cookie value=%s, COOKIEVALUE1=%s\n", user_cookie, COOKIEVALUE1);
-					strcpy(redirect_location, LOGIN_PAGE_PATH);
+					strcat(redirect_location, LOGIN_PAGE_PATH);
 					tmp_status_code = CODE_303;
-					stored_str_statusline = create_str_statuscode(tmp_status_code);
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
 				}
-			}
-printf("403処理の前\n");
-			//403 閲覧禁止の場合の処理
-			if(response == NULL && error_flag == 0){
-				tmp_status_code = CODE_403;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-				strcpy(return_path,create_return_path(stored_str_statusline, return_path));
-				error_flag = 1;
-				//上でパスを変更しているので開き直す
-				response = fopen(return_path ,"r");
-			}
-			if(error_flag == 0 && tmp_status_code != CODE_303){
-				tmp_status_code = CODE_200;
-				stored_str_statusline = create_str_statuscode(tmp_status_code);
-			}
 
-			/* ここから下がcookieの処理	*/
-			cookie_create_check = strcmp(return_path, LOGIN_CHECK_PATH);
+				//welcome.htmlに直接来た場合の処理
+//printf("welcome.html前\n%s\n", return_path);
+				if((strstr(return_path, CONTENT_DIR)) != NULL){
+					//cookieを持っていなかったらlogin.htmlにリダイレクト
+					if(strcmp(user_cookie, COOKIEVALUE1) != 0){
+//printf("user_cookie value=%s, COOKIEVALUE1=%s\n", user_cookie, COOKIEVALUE1);
+						strcpy(redirect_location, LOGIN_PAGE_PATH);
+						tmp_status_code = CODE_303;
+						stored_str_statusline = get_str_statuscode(tmp_status_code);
+					}
+				}
+printf("403処理の前\n");
+				//403 閲覧禁止の場合の処理
+				if(response == NULL && error_flag == 0){
+					tmp_status_code = CODE_403;
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
+					strcpy(return_path,create_return_path(stored_str_statusline, return_path));
+					error_flag = 1;
+					//上でパスを変更しているので開き直す
+					response = fopen(return_path ,"r");
+				}
+				if(error_flag == 0 && tmp_status_code != CODE_303){
+					tmp_status_code = CODE_200;
+					stored_str_statusline = get_str_statuscode(tmp_status_code);
+				}
+
+				/* ここから下がcookieの処理	*/
+				cookie_create_check = strcmp(return_path, LOGIN_CHECK_PATH);
 
 printf("cookieの処理\n");
-			fprintf(write_sockf, "%s %d %s\n", str_statusline[stored_str_statusline].version, str_statusline[stored_str_statusline].status_code, str_statusline[stored_str_statusline].explain);
-			fprintf(write_sockf, "Server: Apache\n");
+				fprintf(write_sockf, "%s %d %s\n", str_statusline[stored_str_statusline].version, str_statusline[stored_str_statusline].status_code, str_statusline[stored_str_statusline].explain);
+				fprintf(write_sockf, "Server: Apache\n");
 fprintf(stdout, "Server: Apache\n");
-			fprintf(write_sockf, "Accept-Ranges: bytes\n");
+				fprintf(write_sockf, "Accept-Ranges: bytes\n");
 fprintf(stdout, "Accept-Ranges: bytes\n");
-			if(tmp_status_code == CODE_303){
-				fprintf(write_sockf, "Location:%s \n", redirect_location);
-			}
+				if(tmp_status_code == CODE_303){
+					fprintf(write_sockf, "Location:%s \n", redirect_location);
+				}
 printf("cookieの削除処理の前\n");
 	
 //Cookieの削除logout.html)
-			int cookie_delete_check;
-			cookie_delete_check = strcmp(return_path, LOGOUT_PATH);
+				int cookie_delete_check;
+				cookie_delete_check = strcmp(return_path, LOGOUT_PATH);
 // printf("cookie_delete_check= %d, return_path=%s, COOKIEDELETE=%s\n", cookie_delete_check, return_path, COOKIEDELETE);
-			if(cookie_delete_check == 0){
-				fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; path=/cookie/; expires=%s;\n", COOKIEVALUE1, DELETE_COOKIE_DATE);
-			}
+				if(cookie_delete_check == 0){
+					fprintf(write_sockf, "Set-Cookie: CUSTOMER=%s; path=/cookie/; expires=%s;\n", COOKIEVALUE1, DELETE_COOKIE_DATE);
+				}
 
-			//Cookieの作成（login_check.html)
+				//Cookieの作成（login_check.html)
 printf("cookieの作成\n");
-			if(cookie_create_check == 0){
-				strcpy(cookie_expires_string, create_cookie_limit(cookie_expires_string));
-				fprintf(write_sockf, "%s", cookie_expires_string);
-			}
+				if(cookie_create_check == 0){
+					strcpy(cookie_expires_string, create_cookie_limit(cookie_expires_string));
+					fprintf(write_sockf, "%s", cookie_expires_string);
+				}
 		
-			if(binary_flag == 1){
-				fprintf(write_sockf, "Content-Length: %d\n", file_size);
+				if(binary_flag == 1){
+					fprintf(write_sockf, "Content-Length: %d\n", file_size);
+				}
+				//fprintf(write_sockf, "Content-Lenth: 20\n, fie_sie);
+				fprintf(write_sockf, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
+				fprintf(write_sockf, "\n");
+				//バイナリデータの処理
+				if(binary_flag == 1){
+					write_binary_http_responsebody(response, write_sockf);
+				}
+				if(text_flag = 1){
+					write_txt_http_responsebody(response, write_sockf);
+				}
+				fclose(write_sockf);
+				fclose (sockf);
+				fclose (response);
+				fclose(fp);
+				close(accsock);
+				close(lissock);
+				printf("close完了\n");
+				sleep(10);
+				exit(0);
 			}
-			//fprintf(write_sockf, "Content-Lenth: 20\n, fie_sie);
-			fprintf(write_sockf, "Content-Type: %s\n", str_extension_list[extension_list_array_num].content_type);
-			fprintf(write_sockf, "\n");
-			//バイナリデータの処理
-			if(binary_flag == 1){
-				write_binary_http_responsebody(response, write_sockf);
-			}
-			if(text_flag = 1){
-				write_txt_http_responsebody(response, write_sockf);
-			}
-			fclose(write_sockf);
-			fclose (sockf);
-			fclose (response);
-			fclose(fp);
-			close(accsock);
-			close(lissock);
-			printf("close完了\n");
-			sleep(10);
-			exit(0);
 		}
 	}
 }
@@ -443,34 +454,33 @@ int is_check_argument_err(int argc){
 	return 0;
 }
 /* ----------------------------------------------------------- *
- *  create_str_statuscode ステータスコードから構造体の何番目に格納されているか
+ *  get_str_statuscode ステータスコードから構造体の何番目に格納されているか
  *  を返却する関数
  *  引数：statuscode ステータスコード
  *  戻り値 構造体の何番目に格納されているか
  *  ----------------------------------------------------------- */
-int create_str_statuscode(int stored_number)
+int get_str_statuscode(int status_code)
 {
 	int i, statusline_array;
 	statusline_array = STATUSLINE_ARRAY;
 	for(i = 0;i < statusline_array; i++){
-		if(stored_number == str_statusline[i].status_code){
+		if(status_code == str_statusline[i].status_code){
 			return i;
 		}
 	}
 }
 
 /* ----------------------------------------------------------- *
- *   引数で渡されたステータスコードによって
+ *   create_return_path 引数で渡されたステータスコードによって
  *  ブラウザに返すURLを作成する関数
- *  引数：count_str_statusline：ステータスコードが黄道帯の何番目に格納されているか
  *  return_path:ブラウザに返却するパス
  *  戻り値：i 構造体の何番目に格納されているか return_pathブラウザに返却するパス
  *  ----------------------------------------------------------- */
-char* create_return_path (int statuscode, char *return_path){
+char* create_return_path (int stored_number, char *return_path){
 
-printf("create_return_pathの中%d\n", statuscode);
+printf("create_return_pathの中%d\n", stored_number);
 	strcpy(return_path, DOCUMENTROOT);
-	strcat(return_path, str_statusline[statuscode].pagename);
+	strcat(return_path, str_statusline[stored_number].pagename);
 
 }
 
