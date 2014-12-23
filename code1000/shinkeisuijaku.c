@@ -1,18 +1,17 @@
 #include<stdio.h>
 #include<stdlib.h>
 
-#define MAX_LENGTH 13
-#define MAX_WIDTH 4
 #define MAX_CARD 52
 #define SHUFFLE 20
 #define ONCE_TURNED_CARD 2
 #define	FINISHED_CARD 1
 #define INIT_CARD 0
+#define DEFAULT_MEMORY 10
 
 //カードの状態を描写する
 int describe_card(int card[][MAX_LENGTH],  int information_card[][MAX_LENGTH]);
 //最初のみ使用。カードをランダムに置き換える
-int put_card_randam(int card[][MAX_LENGTH],int information_card[][MAX_LENGTH]);
+int put_card_random(int card[][MAX_LENGTH],int information_card[][MAX_LENGTH]);
 //カードが同じ数字かどうかを判定する関数
 int check_cards(int x1,int y1,int x2,int y2,int card[][MAX_LENGTH]);
 //自分のターンを実行する関数
@@ -20,7 +19,7 @@ int play_my_turn(int card[][MAX_LENGTH], int information_card[][MAX_LENGTH]);
 //敵のターンを実行する関数
 int play_enemy_turn(int card[][MAX_LENGTH], int information_card[][MAX_LENGTH]);
 //play_enemy_turnの中で敵が引くカードを作る関数
-void draw_enemy_card(int *x1,int *y1,int information_card[][MAX_LENGTH]);
+int draw_enemy_card(int *x1,int *y1,int information_card[][MAX_LENGTH]);
 //二つの整数型の入力を受け付ける関数
 void scanf_two_int(int *, int *);
 //カードのエラーチェック
@@ -34,29 +33,45 @@ void func_mark_to_card_miss(int x1,int x2,int y1,int y2,int information_card[][M
 //重複の処理
 int is_checked_overlap(int *x,int *y, int information_card[][MAX_LENGTH]);
 
+struct card {
+	//場に出ているカードの値
+	int value[MAX_CARD];
+	//一度ひっくり返したことがあるか、既に場に無いか、手をつけたことが無いかの情報
+	int info[MAX_CARD];
+};
+
+struct enemy_info {
+	int x;
+	int x;
+	int memory[DEFAULT_MEMORY];
+	int score;
+}
+struct myself_info {
+	int x;
+	int y;
+	int score;
+}
+
 
 int main()
 {
-	/*変数解説
-	*card_array 1〜13までのカードに書いてある数値が格納されている
-	*information_card 既にその場にないカード、一回ひっくり返した事のあるカード、まだ
-	*ひっくり返した事の無いカード情報が格納されている
-	*/
-	int card_array[MAX_WIDTH][MAX_LENGTH], information_card[MAX_WIDTH][MAX_LENGTH];
 	int end_flag = 0,sum = 0, my_score = 0, enemy_score = 0;
-
-	put_card_randam(card_array, information_card);
+	struct card str_card;
+	struct enemy_info str_enemy;
+	struct myself_info str_myself;
+	put_card_random(str_card,str_enemy);
 	printf("神経衰弱をはじめましょう\n");
 
 	do{
 		while(sum <= MAX_CARD / 2){
-			my_score = play_my_turn(card_array, information_card);
-			enemy_score = play_enemy_turn(card_array, information_card);	
-			sum = my_score + enemy_score;
+	//		my_score = play_my_turn(str_card,str_enemy);
+			str_myself.score = play_enemy_turn(str_card,str_enemy);
+			str_enemy.score = play_enemy_turn(str_card,str_enemy);	
+			sum = str_myself.score + str_enemy.score;
 		}
-		if(my_score > enemy_score){ 
+		if(str_myself.score > str_enemy.score){ 
 			printf("貴方の勝ち\n");
-		} else if(my_score == enemy_score) {
+		} else if(str_myself.score == str_enemy.score) {
 			printf("引き分け\n");
 		} else {
 			printf("敵の勝ち\n");
@@ -75,56 +90,57 @@ int main()
  *  まだ引かれてないカードの値が格納
  *  戻り値 数値型 score得点。あたっていたら1を返す。あたっていなかったら0 
  * ----------------------------------------------------------- */
-int play_enemy_turn(int card[][MAX_LENGTH], int information_card[][MAX_LENGTH]){
+int play_enemy_turn(struct str_card, struct str_enemy){
 
-	int x1,y1,x2,y2,score = 0,i,j,k, error_flag = 0;
-	describe_card(card, information_card);
+	int i,j,k, error_flag = 0, score = 0;
+	describe_card(str_card);
 
 	do{
 		printf("敵のターンです\n");
+		//memoryの中の値を消す処理
 		//敵のカードを引く処理
-		draw_enemy_card(&x1,&y1, information_card);
-		printf("1枚目はx=%d,y=%dをめくります。\n", x1,y1);
+		str_enemy.x = draw_enemy_card(str_card, str_enemy);
+		printf("1枚目はx=%dをめくります。\n",str_enemy.x1);
 	
-		printf("2枚目に引く、座標を指定してください(x y)\n");
 		//敵のカードを引く処理
-		draw_enemy_card(&x2,&y2, information_card);
-		if(x1 == y1 && x2 == y2){
+		str_enemy.y = draw_enemy_card(str_card, str_enemy);
+		if(str_enemy.x == str_enemy.y){
 			printf("エラー！xとyに同じ座標は選べません。\n");
 			error_flag = -1;
 			continue;
 		}
 	}while(error_flag == -1);
 
-	printf("2枚目はx=%d,y=%dをめくります。\n", x2,y2);
-	score = check_cards(x1, y1, x2, y2, card);
+	printf("2枚目はx=%dをめくります。\n", str_enemy.y);
+	score = check_cards(str_card, str_enemy);
 	if(score == 1){
-		func_mark_to_card_strike(x1,x2,y1,y2,information_card);
+		func_mark_to_card_strike(str_card, str_enemy);
 		return score;
 	}
-	func_mark_to_card_miss(x1,x2,y1,y2,information_card);
+	func_mark_to_card_miss(str_card, str_enemy);
 
 }
 
 /* ----------------------------------------------------------- *
- *  draw_enemy_card:敵がカードを引く処理
+ *  draw_enemy_card:敵がカードを1枚引く処理
  *  引数：int *x,int *y：x座標とy座標
  *  int information_card[][MAX_LENGTH]:カードの情報が格納
  *  戻り値　明示的なものは無し。(xとyが実質的な戻り値)
  * ----------------------------------------------------------- */
-void draw_enemy_card(int *x,int *y,int information_card[][MAX_LENGTH])
+int draw_enemy_card(struct str_card, struct str_enemy)
 {
-	int overlap_error_flag = 0,error_flag = 0;
+	int x, overlap_error_flag = 0,error_flag = 0;
 	do{
-		*x = rand() % ((MAX_WIDTH -1) - 0 + 1) + 0;
-		*y = rand() % ((MAX_LENGTH -1) - 0 + 1) + 0;
-		error_flag = is_check_error_number_for_enemy(&x, &y);
-		overlap_error_flag = is_checked_overlap(&x,&y,information_card);
+		x = rand() % ((MAX_CARD -1) - 0 + 1) + 0;
+		error_flag = is_check_error_number_for_enemy(x, str_enemy);
+
+		overlap_error_flag = is_checked_overlap(str_enemy,str_card);
 		if(overlap_error_flag != 0){
 printf("overlap\n");
 			error_flag = overlap_error_flag;
 		}
 	}while(error_flag != 0);
+	return x;
 
 }
 /* ----------------------------------------------------------- *
@@ -134,7 +150,7 @@ printf("overlap\n");
  *  まだ引かれてないカードの値が格納
  *  戻り値 数値型 score得点。あたっていたら1を返す。あたっていなかったら0 
  * ----------------------------------------------------------- */
-int play_my_turn(int card[][MAX_LENGTH], int information_card[][MAX_LENGTH]){
+int play_my_turn(struct str_card, struct str_myself){
 
 	int x1,y1,x2,y2,score = 0,i,j,k, error_flag = 0,once_turned = ONCE_TURNED_CARD;
 	describe_card(card, information_card);
@@ -144,7 +160,6 @@ int play_my_turn(int card[][MAX_LENGTH], int information_card[][MAX_LENGTH]){
 		printf("1枚目に引く、座標を指定してください(x y)\n");
 		scanf_two_int(&x1,&y1);
 		error_flag = is_check_error_number(x1,y1,information_card);
-printf("error_flag=%d", error_flag);
 		if(error_flag != 0){
 			continue;
 		}
@@ -161,7 +176,7 @@ printf("error_flag=%d", error_flag);
 	}while(error_flag != 0);
 
 	printf("x=%d,y=%dをめくります。\n", x2,y2);
-	score = check_cards(x1, y1, x2, y2, card);
+	score = check_cards(str_card);
 	if(score == 1){
 		func_mark_to_card_strike(x1,x2,y1,y2,information_card);
 		return score;
@@ -177,12 +192,11 @@ printf("error_flag=%d", error_flag);
  *  戻り値　明示的なものは無し( information_card[x1][y1]information_card[x2][y2]が
  *  実質的な戻り値)
  * ----------------------------------------------------------- */
-void func_mark_to_card_strike(int x1,int x2,int y1,int y2,int information_card[][MAX_LENGTH])
+void func_mark_to_card_strike(struct str_card, struct str_player)
 {
-
 	printf("当たりのときの処理\n");
-	information_card[x1][y1] = FINISHED_CARD;
-	information_card[x2][y2] = FINISHED_CARD;
+	str_card.info[str_player.x] = FINISHED_CARD;
+	str_card.info[str_player.y] = FINISHED_CARD;
 }
 
 /* ----------------------------------------------------------- *
@@ -194,9 +208,9 @@ void func_mark_to_card_strike(int x1,int x2,int y1,int y2,int information_card[]
  *  実質的な戻り値)
  * ----------------------------------------------------------- */
 
-void func_mark_to_card_miss(int x1, int x2,int y1, int y2, int information_card[][MAX_LENGTH])
+void func_mark_to_card_miss(struct str_card, struct str_player)
 {
-	if(information_card[x1][y1] != FINISHED_CARD || information_card[x2][y2] != FINISHED_CARD){
+	if(str_card.info[str_player.x] != FINISHED_CARD || str_card.info[str_player.y] != FINISHED_CARD){
 		printf("外れのときの処理\n");
 		information_card[x1][y1] = ONCE_TURNED_CARD;
 		information_card[x2][y2] = ONCE_TURNED_CARD;
@@ -211,16 +225,13 @@ void func_mark_to_card_miss(int x1, int x2,int y1, int y2, int information_card[
  *  引数：input1,input2:x座標とy座標
  *  戻り値　error_flag エラーがあった場合-1
  * ----------------------------------------------------------- */
-int is_check_error_number_for_enemy(int **x,int **y)
+int is_check_error_number_for_enemy(int x,int y)
 {
 	int error_flag = 0,overlap_error_flag = 0, i,j;
-printf("is_check_error_numberの中input1=%d,input2=%d", **x, **y);
-	if(**x > MAX_WIDTH){
+//printf("is_check_error_numberの中input1=%d,input2=%d\n", **x, **y);
+	if(x > MAX_WIDTH){
 		error_flag = -1;
 	}
-	if(**y > MAX_LENGTH){
-		error_flag = -1;
-	} 
 	return error_flag;
 }
 
@@ -257,12 +268,11 @@ printf("overlap_error_flag=%d",overlap_error_flag);
  *  戻り値 数値型 error_flag 重複があれば-1を返す
  * ----------------------------------------------------------- */
 
-int is_checked_overlap(int *x,int *y, int information_card[][MAX_LENGTH])
+int is_checked_overlap(int x, struct str_card)
 {
-printf("is_checked_overlapの中。重複\n");
-	int  error_flag = 0,finished = FINISHED_CARD;
+	int  error_flag = 0, FINISHED_CARD;
 	//カードの重複チェック
-	if(information_card[*x][*y] == finished){
+	if(str_card.info[x] == finished){
 		printf("is_checked_overlapの中。重複\n");
 		error_flag = -1;
 	}
@@ -295,10 +305,10 @@ void scanf_two_int(int *input1, int *input2)
  *  戻り値 数値型 あたっていたら1を返す
  * ----------------------------------------------------------- */
 
-int check_cards(int x1,int y1,int x2,int y2,int card[][MAX_LENGTH])
+int check_cards(struct str_card, struct str_player)
 {
-	printf("めくったカードは%dと%dでした\n", card[x1][y1], card[x2][y2]);
-	if(card[x1][y1] == card[x2][y2]){
+	printf("めくったカードは%dと%dでした\n", str_card.value[str_player.x], str_card.value[str_player.y]);
+	if(str_card.value[str_player.x] == str_card.value[str_player.y]){
 		printf("あたりです\n");
 		return 1;
 	}
@@ -313,8 +323,7 @@ int check_cards(int x1,int y1,int x2,int y2,int card[][MAX_LENGTH])
  *  戻り値 数値型 input:ユーザが入力した内容
  * ----------------------------------------------------------- */
 
-
-int describe_card(int card[][MAX_LENGTH],int information_card[][MAX_LENGTH])
+int describe_card(struct str_card, struct str_enemy_info)
 {
 	int i = 0, j = 0;
 	printf("■ まだめくっていない\n");
@@ -326,7 +335,7 @@ printf("information\n");
 for(i = 0; i < 4; i++){
 printf("%d ", i);
 for(j = 0; j < 13; j++){
-printf("%d,", information_card[i][j]);
+printf("%d,", str_card.);
 }
 printf("\n");
 }
@@ -377,7 +386,7 @@ int scanf_int()
 }
 
 
-int put_card_randam(int card[][MAX_LENGTH],int information_card[][MAX_LENGTH])
+int put_card_random(int card[][MAX_LENGTH],int information_card[][MAX_LENGTH])
 {
 	int i = 0, j = 0, x1,x2,y1,y2, buffer;
 	for(i = 0; i < 4; i++){
@@ -407,4 +416,5 @@ printf("%d ",  card[i][j]);
 printf("\n");
 }
 	
+	inddt enemy[MAX_CARD];
 }
